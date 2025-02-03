@@ -1,0 +1,21 @@
+All numbers are big endian and zero padded towards the left.
+For uint16_t 0xabcd, the bytes are [0xab, 0xcd]. For uint16_t 0xcd, it's [0x00, 0xcd].
+
+Request:
+	Header (present on all packets): Coordinate X (uint16_t 2 bytes) | Coordinate Y (uint16_t 2 bytes)
+	Data for packet type:
+	- Write pixel: Packet indicator (unsigned char, always \x01 for write) | Color (uint32_t 4 bytes RRGGBBAA)
+	- Read pixel: Packet indicator (unsigned char, always \x00 for read) | Padding (uint32_t 4 bytes, can be anything; not read)
+
+The padding on read exists, so that all packets are equal sized. This allows for a constant width across all packets,
+and allows the server to read one chunk of data at a time to parse the next packet.
+
+Errors / Exceptional situations:
+	In the following cases:
+	- Coordinate is out of bounds (x >= width, y >= height)
+	- Packet indicator is unrecognized (not described above)
+	- On write, alpha of the color is 0 (the new color is fully transparent)
+	The packet is ignored without feedback. The connection remains open.
+
+Response:
+	- Response for read: Packet indicator (unsigned char, always \x80) | Color (3 bytes RRGGBB)
