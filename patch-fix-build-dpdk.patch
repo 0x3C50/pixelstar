@@ -1,0 +1,257 @@
+diff --git a/buildtools/check-symbols.sh b/buildtools/check-symbols.sh
+index e458c0af72..bdc878842d 100755
+--- a/buildtools/check-symbols.sh
++++ b/buildtools/check-symbols.sh
+@@ -5,36 +5,36 @@
+ MAPFILE=$1
+ OBJFILE=$2
+ 
+-ROOTDIR=$(readlink -f $(dirname $(readlink -f $0))/..)
++ROOTDIR=$(readlink -f "$(dirname "$(readlink -f "$0")")"/..)
+ LIST_SYMBOL=$ROOTDIR/buildtools/map-list-symbol.sh
+ CHECK_SYMBOL_MAPS=$ROOTDIR/devtools/check-symbol-maps.sh
+ 
+ # added check for "make -C test/" usage
+-if [ ! -e $MAPFILE ] || [ ! -f $OBJFILE ]
++if [ ! -e "$MAPFILE" ] || [ ! -f "$OBJFILE" ]
+ then
+ 	exit 0
+ fi
+ 
+-if [ -d $MAPFILE ]
++if [ -d "$MAPFILE" ]
+ then
+ 	exit 0
+ fi
+ 
+-DUMPFILE=$(mktemp -t dpdk.${0##*/}.objdump.XXXXXX)
++DUMPFILE=$(mktemp -t dpdk."${0##*/}".objdump.XXXXXX)
+ trap 'rm -f "$DUMPFILE"' EXIT
+-objdump -t $OBJFILE >$DUMPFILE
++objdump -t "$OBJFILE" >"$DUMPFILE"
+ 
+ ret=0
+ 
+-if ! $CHECK_SYMBOL_MAPS $MAPFILE; then
++if ! "$CHECK_SYMBOL_MAPS" "$MAPFILE"; then
+ 	ret=1
+ fi
+ 
+-for SYM in `$LIST_SYMBOL -S EXPERIMENTAL $MAPFILE |cut -d ' ' -f 3`
++for SYM in `"$LIST_SYMBOL" -S EXPERIMENTAL "$MAPFILE" |cut -d ' ' -f 3`
+ do
+-	if grep -q "\.text.*[[:space:]]$SYM$" $DUMPFILE &&
+-		! grep -q "\.text\.experimental.*[[:space:]]$SYM$" $DUMPFILE &&
+-		$LIST_SYMBOL -s $SYM $MAPFILE | grep -q EXPERIMENTAL
++	if grep -q "\.text.*[[:space:]]$SYM$" "$DUMPFILE" &&
++		! grep -q "\.text\.experimental.*[[:space:]]$SYM$" "$DUMPFILE" &&
++		"$LIST_SYMBOL" -s "$SYM" "$MAPFILE" | grep -q EXPERIMENTAL
+ 	then
+ 		cat >&2 <<- END_OF_MESSAGE
+ 		$SYM is not flagged as experimental
+@@ -50,9 +50,9 @@ for SYM in `awk '{
+ 	if ($2 != "l" && $4 == ".text.experimental" && !($NF ~ /\.$/)) {
+ 		print $NF
+ 	}
+-}' $DUMPFILE`
++}' "$DUMPFILE"`
+ do
+-	$LIST_SYMBOL -S EXPERIMENTAL -s $SYM -q $MAPFILE || {
++	"$LIST_SYMBOL" -S EXPERIMENTAL -s "$SYM" -q "$MAPFILE" || {
+ 		cat >&2 <<- END_OF_MESSAGE
+ 		$SYM is flagged as experimental
+ 		but is not listed in version map
+@@ -62,10 +62,10 @@ do
+ 	}
+ done
+ 
+-for SYM in `$LIST_SYMBOL -S INTERNAL $MAPFILE |cut -d ' ' -f 3`
++for SYM in `"$LIST_SYMBOL" -S INTERNAL "$MAPFILE" |cut -d ' ' -f 3`
+ do
+-	if grep -q "\.text.*[[:space:]]$SYM$" $DUMPFILE &&
+-		! grep -q "\.text\.internal.*[[:space:]]$SYM$" $DUMPFILE
++	if grep -q "\.text.*[[:space:]]$SYM$" "$DUMPFILE" &&
++		! grep -q "\.text\.internal.*[[:space:]]$SYM$" "$DUMPFILE"
+ 	then
+ 		cat >&2 <<- END_OF_MESSAGE
+ 		$SYM is not flagged as internal
+@@ -83,7 +83,7 @@ for SYM in `awk '{
+ 	}
+ }' $DUMPFILE`
+ do
+-	$LIST_SYMBOL -S INTERNAL -s $SYM -q $MAPFILE || {
++	"$LIST_SYMBOL" -S INTERNAL -s "$SYM" -q "$MAPFILE" || {
+ 		cat >&2 <<- END_OF_MESSAGE
+ 		$SYM is flagged as internal
+ 		but is not listed in version map
+diff --git a/buildtools/map-list-symbol.sh b/buildtools/map-list-symbol.sh
+index 3bf9bd66f8..2c22cff1fc 100755
+--- a/buildtools/map-list-symbol.sh
++++ b/buildtools/map-list-symbol.sh
+@@ -9,14 +9,14 @@ quiet=
+ while getopts 'S:s:q' name; do
+ 	case $name in
+ 	S)
+-		[ $section = 'all' ] || {
++		[ "$section" = 'all' ] || {
+ 			echo 'Cannot list in multiple sections'
+ 			exit 1
+ 		}
+ 		section=$OPTARG
+ 	;;
+ 	s)
+-		[ $symbol = 'all' ] || {
++		[ "$symbol" = 'all' ] || {
+ 			echo 'Cannot list multiple symbols'
+ 			exit 1
+ 		}
+@@ -26,26 +26,28 @@ while getopts 'S:s:q' name; do
+ 		quiet='y'
+ 	;;
+ 	?)
+-		echo 'usage: $0 [-S section] [-s symbol] [-q]'
++		echo "usage: $0 [-S section] [-s symbol] [-q]"
+ 		exit 1
+ 	;;
+ 	esac
+ done
+ 
+-shift $(($OPTIND - 1))
++echo "$symbol" 1>&2
+ 
+-for file in $@; do
++shift $(("$OPTIND" - 1))
++
++for file in "$@"; do
+ 	cat "$file" |awk '
+ 	BEGIN {
+ 		current_section = "";
+-		if ("'$section'" == "all" && "'$symbol'" == "all") {
++		if ("'"$section"'" == "all" && "'"$symbol"'" == "all") {
+ 			ret = 0;
+ 		} else {
+ 			ret = 1;
+ 		}
+ 	}
+ 	/^.*\{/ {
+-		if ("'$section'" == "all" || $1 == "'$section'") {
++		if ("'"$section"'" == "all" || $1 == "'"$section"'") {
+ 			current_section = $1;
+ 		}
+ 	}
+@@ -53,12 +55,12 @@ for file in $@; do
+ 	/^[^}].*[^:*];/ {
+ 		if (current_section != "") {
+ 			gsub(";","");
+-			if ("'$symbol'" == "all" || $1 == "'$symbol'") {
++			if ("'"$symbol"'" == "all" || $1 == "'"$symbol"'") {
+ 				ret = 0;
+ 				if ("'$quiet'" == "") {
+-					print "'$file' "current_section" "$1;
++					print "'"$file"' "current_section" "$1;
+ 				}
+-				if ("'$symbol'" != "all") {
++				if ("'"$symbol"'" != "all") {
+ 					exit 0;
+ 				}
+ 			}
+diff --git a/buildtools/symlink-drivers-solibs.sh b/buildtools/symlink-drivers-solibs.sh
+index 42985e8556..c97fd343fd 100644
+--- a/buildtools/symlink-drivers-solibs.sh
++++ b/buildtools/symlink-drivers-solibs.sh
+@@ -10,4 +10,4 @@
+ # 1. directory for installed regular libs e.g. lib64
+ # 2. subdirectory of libdir where the pmds are
+ 
+-cd ${MESON_INSTALL_DESTDIR_PREFIX}/$1 && ln -sfv $2/librte_*.so* .
++cd "${MESON_INSTALL_DESTDIR_PREFIX}"/"$1" && ln -sfv "$2"/librte_*.so* .
+diff --git a/devtools/check-symbol-maps.sh b/devtools/check-symbol-maps.sh
+index 8c116bfa9c..a87e1e7123 100755
+--- a/devtools/check-symbol-maps.sh
++++ b/devtools/check-symbol-maps.sh
+@@ -2,36 +2,36 @@
+ # SPDX-License-Identifier: BSD-3-Clause
+ # Copyright 2018 Mellanox Technologies, Ltd
+ 
+-cd $(dirname $0)/..
++cd "$(dirname "$0")"/..
+ 
+ # speed up by ignoring Unicode details
+ export LC_ALL=C
+ 
+ if [ $# = 0 ] ; then
+-    set -- $(find lib drivers -name '*.map' -a ! -path drivers/version.map)
++    set -- "$(find lib drivers -name '*.map' -a ! -path drivers/version.map)"
+ fi
+ 
+ ret=0
+ 
+ find_orphan_symbols ()
+ {
+-    for map in $@ ; do
+-        for sym in $(sed -rn 's,^([^}]*_.*);.*$,\1,p' $map) ; do
+-            if echo $sym | grep -q '^per_lcore_' ; then
++    for map in "$@" ; do
++        for sym in $(sed -rn 's,^([^}]*_.*);.*$,\1,p' "$map") ; do
++            if echo "$sym" | grep -q '^per_lcore_' ; then
+                 symsrc=${sym#per_lcore_}
+-            elif echo $sym | grep -q '^__rte_.*_trace_' ; then
++            elif echo "$sym" | grep -q '^__rte_.*_trace_' ; then
+                 symsrc=${sym#__}
+             else
+                 symsrc=$sym
+             fi
+-            if [ -z "$(grep -rlw $symsrc $(dirname $map) | grep -v $map)" ] ; then
++            if [ -z "$(grep -rlw "$symsrc" "$(dirname "$map")" | grep -v "$map")" ] ; then
+                 echo "$map: $sym"
+             fi
+         done
+     done
+ }
+ 
+-orphan_symbols=$(find_orphan_symbols $@)
++orphan_symbols=$(find_orphan_symbols "$@")
+ if [ -n "$orphan_symbols" ] ; then
+     echo "Found only in symbol map file:"
+     echo "$orphan_symbols" | sed 's,^,\t,'
+@@ -40,20 +40,20 @@ fi
+ 
+ find_duplicate_symbols ()
+ {
+-    for map in $@ ; do
+-        buildtools/map-list-symbol.sh $map | \
++    for map in "$@" ; do
++        buildtools/map-list-symbol.sh "$map" | \
+             sort | uniq -c | grep -v " 1 $map" || true
+     done
+ }
+ 
+-duplicate_symbols=$(find_duplicate_symbols $@)
++duplicate_symbols=$(find_duplicate_symbols "$@")
+ if [ -n "$duplicate_symbols" ] ; then
+     echo "Found duplicates in symbol map file:"
+     echo "$duplicate_symbols"
+     ret=1
+ fi
+ 
+-local_miss_maps=$(grep -L 'local: \*;' $@ || true)
++local_miss_maps=$(grep -L 'local: \*;' "$@" || true)
+ if [ -n "$local_miss_maps" ] ; then
+     echo "Found maps without local catch-all:"
+     echo "$local_miss_maps"
+@@ -62,12 +62,12 @@ fi
+ 
+ find_empty_maps ()
+ {
+-    for map in $@ ; do
+-        [ $(buildtools/map-list-symbol.sh $map | wc -l) != '0' ] || echo $map
++    for map in "$@"; do
++        [ "$(buildtools/map-list-symbol.sh "$map" | wc -l)" != '0' ] || echo "$map"
+     done
+ }
+ 
+-empty_maps=$(find_empty_maps $@)
++empty_maps=$(find_empty_maps "$@")
+ if [ -n "$empty_maps" ] ; then
+     echo "Found empty maps:"
+     echo "$empty_maps"
