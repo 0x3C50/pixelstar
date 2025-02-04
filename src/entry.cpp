@@ -58,8 +58,58 @@
 // }
 
 
+[[noreturn]] void doBench() {
+#define N_SOCKETS 100
+	int sockets[N_SOCKETS];
+	for (int i = 0; i < N_SOCKETS; i++) {
+		int j;
+		sockets[i] = j = socket(AF_INET, SOCK_STREAM, 0);
+		if (j < 0) {
+			perror("socket creation failed");
+			return;
+		}
+		int k = 2+2+1+4;
+		setsockopt(j, SOL_SOCKET, SO_SNDBUF, &k, sizeof(k));
+		sockaddr_in sa;
+		sa.sin_family = AF_INET;
+		sa.sin_port = htons(1235);
+		sa.sin_addr.s_addr = INADDR_ANY; // 0.0.0.0 LO
+		if (const int rt = connect(j, reinterpret_cast<sockaddr*>(&sa), sizeof(sa)); rt < 0) {
+			perror("socket connect failed");
+			return;
+		}
+	}
+	constexpr int psx = 2+2+1+4;
+	time_t lastLog = 0;
+	for (;;) {
+		char packet[psx];
+		packet[4] = 0x01;
+		short* bruh = reinterpret_cast<short*>(packet);
+		int* bruh2 = reinterpret_cast<int*>(packet+2+2+1);
+		for (int i = 0; i < N_SOCKETS; i++) {
+			int sfd = sockets[i];
+			const int rnd1 = rand();
+			const int rnd2 = rand();
+			short x = __builtin_bswap16((rnd1 >> 16) % 64);
+			short y = __builtin_bswap16((rnd1 & 0xFFFF) % 64);
+			bruh[0] = x;
+			bruh[1] = y;
+			bruh2[0] = rnd2;
+
+			write(sfd, bruh, psx);
+		}
+		if (const time_t now = time(nullptr); now - lastLog > 1) {
+			lastLog = now;
+			puts("still alive...");
+		}
+	}
+}
 
 int main(const int argc, char** argv) {
+	if (argc == 2 && strcmp(argv[1], "bench") == 0) {
+		doBench();
+		return 0;
+	}
 	try {
 		seastar::app_template app;
 		app.run(argc, argv, pixelstar::main);

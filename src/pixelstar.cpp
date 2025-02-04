@@ -126,12 +126,12 @@ seastar::future<> pixelstar::service_shard::handle_connection(seastar::connected
 
 seastar::future<> pixelstar::service_shard::handle_packet(size_t abs_index, seastar::output_stream<char> &out,
                                                           const seastar::temporary_buffer<char> &read_packet) const {
-	size_t our_index = abs_index;
+	// todo optimize the fuck out of this; its the largest self-time consuming piece of shit in the chain rn
 	PXS_DBG(pxslog.info("relative index: {}", our_index))
 	switch (read_packet[4]) {
 		case '\x00': {
 			// read pixel
-			const uint32_t existing_color = this->state->buffer[our_index];
+			const uint32_t existing_color = this->state->buffer[abs_index];
 			PXS_DBG(pxslog.info("read: {}", existing_color))
 			unsigned char buffer[4];
 			buffer[0] = 0x80;
@@ -150,7 +150,7 @@ seastar::future<> pixelstar::service_shard::handle_packet(size_t abs_index, seas
 				// return out.write("\x81", 1).then([&out] { return out.flush(); });
 				return seastar::make_ready_future();
 			} else if (alpha != 255) {
-				const uint32_t existing1 = this->state->buffer[our_index];
+				const uint32_t existing1 = this->state->buffer[abs_index];
 				// normal case: transparency between 1 and 254 inclusive
 				const float falpha = alpha / 255.f;
 				to_write =
@@ -159,7 +159,7 @@ seastar::future<> pixelstar::service_shard::handle_packet(size_t abs_index, seas
 					lerpInt(existing1 >> 8 & 0xFF, to_write >> 8 & 0xFF, falpha) << 8;
 			} // else edge case: full transparency; no modification to color
 			PXS_DBG(pxslog.info("write actual: {}", to_write))
-			this->state->buffer[our_index] = to_write;
+			this->state->buffer[abs_index] = to_write;
 			// return out.write("\x81", 1).then([&out] { return out.flush(); });
 			return seastar::make_ready_future();
 		}
